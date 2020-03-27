@@ -103,6 +103,8 @@ type ClusterChecker struct {
 	e                store.Store
 	endPollonProxyCh chan error
 
+	destAddr *net.TCPAddr
+
 	pollonMutex sync.Mutex
 }
 
@@ -174,6 +176,13 @@ func (c *ClusterChecker) stopPollonProxy() {
 func (c *ClusterChecker) sendPollonConfData(confData pollon.ConfData) {
 	c.pollonMutex.Lock()
 	defer c.pollonMutex.Unlock()
+	// check confData
+	if confData.DestAddr == nil {// some error happened, use cached cluster data
+		if c.destAddr != nil {// using cache
+			log.Errorw("failed to get cluster data, using cached address to keep the DB available", "address", c.destAddr)
+			confData.DestAddr = c.destAddr
+		}
+	}
 	if c.pp != nil {
 		c.pp.C <- confData
 	}
@@ -261,6 +270,8 @@ func (c *ClusterChecker) Check() error {
 	// sentinel has read our proxyinfo and knows we are alive
 	if util.StringInSlice(proxy.Spec.EnabledProxies, c.uid) {
 		log.Infow("proxying to master address", "address", addr)
+		// store cluster data for cache
+		c.destAddr = addr
 		c.sendPollonConfData(pollon.ConfData{DestAddr: addr})
 	} else {
 		log.Infow("not proxying to master address since we aren't in the enabled proxies list", "address", addr)
