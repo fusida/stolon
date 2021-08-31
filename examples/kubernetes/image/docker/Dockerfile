@@ -8,8 +8,8 @@ WORKDIR /stolon
 # only copy go.mod and go.sum
 COPY go.mod .
 COPY go.sum .
+COPY vendor/ vendor/
 
-RUN go mod download
 
 #######
 ####### Build the stolon binaries
